@@ -8,9 +8,12 @@ import { base58 } from "@metaplex-foundation/umi/serializers";
 import { irysUploader } from "@metaplex-foundation/umi-uploader-irys";
 import fs from "fs";
 import { config } from "./config.js";
+import chalk from "chalk";
 
 
 export const createCollectionByName = async (name) => {
+
+    console.log(chalk.blue(`\nCreating Collection: ${name}...\n`));
   
     const umi = createUmi(config.server)
         .use(mplCore())
@@ -31,26 +34,32 @@ export const createCollectionByName = async (name) => {
     );
 
     umi.use(keypairIdentity(keypair));
+
+    console.log(chalk.green('Step 1: Initializing setup... [OK]'));
   
     //
     // ** Creating the Collection **
     //
   
     const collection = generateSigner(umi)
-  
-    console.log('Creating Collection...')
+
     const tx = await createCollection(umi, {
       collection,
       name: name
     }).sendAndConfirm(umi);
   
-    const signature = base58.deserialize(tx.signature)[0]
-  
-    console.log('\Collection Created')
-    console.log('View Transaction on Solana Explorer')
-    console.log(`https://explorer.solana.com/tx/${signature}?cluster=devnet`)
-    console.log("View NFT on Metaplex Explorer");
-    console.log(`https://explorer.solana.com/address/${collection.publicKey}?cluster=devnet`);
+    const signature = base58.deserialize(tx.signature)[0];
+
+    console.log(chalk.green('Step 2: Collection create... [OK]'));
+
+    console.log(chalk.green('\tView Transaction on Solana Explorer'));
+    console.log(chalk.white(`\t\thttps://explorer.solana.com/tx/${signature}?cluster=devnet`));
+    console.log(chalk.green('\tView NFT on Metaplex Explorer'));
+    console.log(chalk.white(`\t\thttps://explorer.solana.com/address/${collection.publicKey}?cluster=devnet`));
+
+    console.log(chalk.green('Step 3: Generate URL... [OK]'));
+
+    console.log(chalk.bold.blue('\nProcess completed successfully! 🎉'));
 
     return {
         "publicKey" : collection.publicKey,

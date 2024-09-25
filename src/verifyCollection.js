@@ -1,10 +1,11 @@
 import { createUmi } from '@metaplex-foundation/umi-bundle-defaults';
-import { mplCore } from "@metaplex-foundation/mpl-core";
-import { verifyCollectionV1, findMetadataPda } from '@metaplex-foundation/mpl-token-metadata'
+import { 
+    mplTokenMetadata,
+    verifyCollectionV1, 
+    findMetadataPda
+} from '@metaplex-foundation/mpl-token-metadata'
 import {
-    keypairIdentity,
-    publicKey,
-    generateSigner
+    keypairIdentity
 } from "@metaplex-foundation/umi";
 
 import { config } from "./config.js";
@@ -25,31 +26,25 @@ export const verifyCollection = async (data, res) => {
         return;
     }
 
-    const umi = createUmi(config.server)
-        .use(mplCore());
+    const umi = createUmi(config.server).use(mplTokenMetadata());
 
     const walletFile = JSON.parse(
         fs.readFileSync("./id.json")
     );
 
-    let keypair = umi.eddsa.createKeypairFromSecretKey(
+    const keypair = umi.eddsa.createKeypairFromSecretKey(
         new Uint8Array(walletFile)
     );
 
     umi.use(keypairIdentity(keypair));
     
-
-    const metadata = findMetadataPda(umi, {
-        mint: publicKey(contentMint)
-    });
-
-    const collectionAuthority = generateSigner(umi);
-
-    await verifyCollectionV1(umi, {
-        metadata,
-        collectionMint,
-        authority: collectionAuthority
-    }).sendAndConfirm(umi);
+    const transaction = await verifyCollectionV1(umi, {
+        metadata: findMetadataPda(umi, { mint: contentMint }),
+        collectionMint: collectionMint,
+        authority: umi.identity,
+    })
+    
+    transaction.sendAndConfirm(umi);
 
     return;
 }
