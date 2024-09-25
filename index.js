@@ -1,5 +1,6 @@
 import { createCollectionByName } from "./src/collectionMint.js";
 import { createCoreNFTMint } from "./src/coreNFTMint.js";
+import { verifyCollection } from "./src/verifyCollection.js";
 import express from "express";
 var app = express();
 
@@ -30,12 +31,20 @@ app.post("/collection", async function(req, res, next){
 app.post("/nft", async function(req, res, next){
 
     if( req.body != undefined ){
-        const result = await createCoreNFTMint(req.body);
+        await createCoreNFTMint(req.body, res);
+        return;
+    }
 
-        res.json({
-            "status": true,
-            "result" : result
-        })
+    res.json({
+        "status": false,
+        a: req.body
+    });
+});
+
+app.put("/nft/verify", async function(req, res, next){
+
+    if( req.body != undefined ){
+        await verifyCollection(req.body, res);
         return;
     }
 

@@ -1,11 +1,5 @@
 import { createUmi } from '@metaplex-foundation/umi-bundle-defaults'
-import {
-    mplCandyMachine as mplCoreCandyMachine, create,
-    addConfigLines,
-    fetchCandyMachine,
-    deleteCandyMachine,
-    mintV1,
-} from "@metaplex-foundation/mpl-core-candy-machine";
+import { create, mplCore } from "@metaplex-foundation/mpl-core";
 import {
     publicKey,
     generateSigner,
@@ -15,10 +9,15 @@ import {
     sol,
     dateTime,
     createGenericFile,
-    signerIdentity,
+    signerIdentity
 } from '@metaplex-foundation/umi';
-import { mplCore } from '@metaplex-foundation/mpl-core';
+
+import {
+      verifyCollectionV1,
+      findMetadataPda,
+} from "@metaplex-foundation/mpl-token-metadata";
 import { setComputeUnitLimit } from '@metaplex-foundation/mpl-toolbox';
+import { base58 } from "@metaplex-foundation/umi/serializers";
 import { irysUploader } from "@metaplex-foundation/umi-uploader-irys";
 import fs from "fs";
 import { config } from "./config.js";
@@ -29,19 +28,25 @@ const options = {
     confirm: { commitment: 'processed' }
 };
 
-export const createCoreNFTMint = async (data) => {
+export const createCoreNFTMint = async (data, res) => {
 
     const collectionAddress = data.collection ?? null;
-    const contents = data.contents ?? null;
+    const file = data.file ?? null;
+    const name = data.name ?? null;
 
-    if( contents == null || contents.length <= 0){
-        return {
-            "error": "No Contents"
-        };
+    if( 
+        file == null || 
+        name == null
+    ){
+        res.json({
+            "status": false,
+            "error": "No fields"
+        });
+        return;
     }
 
     const umi = createUmi(config.server)
-        .use(mplCoreCandyMachine())
+        .use(mplCore())
         .use(
             irysUploader({
                 // mainnet address: "https://node1.irys.xyz"
@@ -49,9 +54,6 @@ export const createCoreNFTMint = async (data) => {
                 address: "https://devnet.irys.xyz",
             })
         );
-
-    const treasury = generateSigner(umi);
-    const candyMachine = generateSigner(umi);
 
     const walletFile = JSON.parse(
         fs.readFileSync("./id.json")
@@ -63,215 +65,98 @@ export const createCoreNFTMint = async (data) => {
 
     umi.use(keypairIdentity(keypair));
 
-    // Create a Candy Machine    
-    try {
-        const createIx = await create(umi, {
-            candyMachine,
-            collection: collectionAddress,
-            collectionUpdateAuthority: umi.identity,
-            itemsAvailable: 3,
-            authority: umi.identity.publicKey,
-            isMutable: false,
-            configLineSettings: some({
-                prefixName: '',
-                nameLength: 0,
-                prefixUri: '',
-                uriLength: 0,
-                isSequential: false,
-            }),
-            guards: {
-                botTax: some({ lamports: sol(0.001), lastInstruction: true }),
-                solPayment: some({ lamports: sol(0.001), destination: treasury.publicKey }),
-                startDate: some({ date: Date.now() }),
-                // All other guards are disabled...
-            }
-        })
-        await createIx.sendAndConfirm(umi, options);
-        console.log(`✅ - Created Candy Machine: ${candyMachine.publicKey.toString()}`)
-    } catch (error) {
-        console.log(error)
-        console.log('❌ - Error creating Candy Machine.');
-    }
+    const imageFilePath = path.resolve(file);
+    const imageFile = fs.readFileSync(imageFilePath);
+    const imageName = path.basename(imageFilePath);
 
-    const configLines = [];
+    const umiImageFile = createGenericFile(imageFile, imageName, {
+        tags: [{ name: "Content-Type", value: "image/png" }],
+    });
 
-    // Add items to the Candy Machine
-    try {
-        
-        for (const content of contents) {
-        
-            const file = content.file ?? null;
-            const name = content.name ?? null;
+    console.log("Uploading Image... : " + imageName);
+
+    const imageUri = await umi.uploader.upload([umiImageFile]).catch((err) => {
+        throw new Error(err);
+    });
+
+    const irysImageUri = imageUri[0].replace("arweave.net", "gateway.irys.xyz");
     
-            if( file == null ){
-                content.status = "No File";
-                configLines.push({ 
-                    name: name
-                });
-                continue;
-            }
-            
-            if( name == null ){
-                content.status = "No Name";
-                continue;
-            }
-
-            const imageFilePath = path.resolve(file);
-            const imageFile = fs.readFileSync(imageFilePath);
-            const imageName = path.basename(imageFilePath);
-
-            const umiImageFile = createGenericFile(imageFile, imageName, {
-                tags: [{ name: "Content-Type", value: "image/png" }],
-            });
-
-            console.log("Uploading Image... : " + imageName);
-
-            const imageUri = await umi.uploader.upload([umiImageFile]).catch((err) => {
-                throw new Error(err);
-            });
-
-            const irysImageUri = imageUri[0].replace("arweave.net", "gateway.irys.xyz");
-            
-            console.log("imageUri: " + irysImageUri);
-            
-            configLines.push({ 
-                name: name,
-                uri: irysImageUri
-            });
-            content.status = "OK";
-        };
-
-        console.log(configLines)
-
-        await addConfigLines(umi, {
-            candyMachine: candyMachine.publicKey,
-            index: 0,
-            configLines: configLines,
-        }).sendAndConfirm(umi, options);
-        console.log(`✅ - Added items to the Candy Machine: ${candyMachine.publicKey.toString()}`)
-    } catch (error) {
-        console.log(error)
-        console.log('❌ - Error adding items to the Candy Machine.');
-    }
-
-    try{
-        const metadata = {
-            name: "My NFTs",
-            description: "This is an NFT on Solana",
-            image: irysImageUri,
-            external_url: "https://example.com",
-            attributes: [
+    console.log("imageUri: " + irysImageUri);
+    
+    const metadata = {
+        name: data.name,
+        description: data.description,
+        image: irysImageUri,
+        external_url: data.external_url,
+        attributes: data.attributes,
+        properties: {
+            files: [
                 {
-                    trait_type: "trait1",
-                    value: "value1",
-                },
-                {
-                    trait_type: "trait2",
-                    value: "value2",
+                    uri: imageUri[0],
+                    type: "image/png",
                 },
             ],
-            properties: {
-                files: [
-                    {
-                        uri: imageUri[0],
-                        type: "image/jpeg",
-                    },
-                ],
-                category: "image",
-            },
-        };
-        console.log("Uploading Metadata...");
-        const metadataUri = await umi.uploader.uploadJson(metadata).catch((err) => {
-            throw new Error(err);
-        });
+            category: "image",
+        },
+    };
 
-        // Replace the Arweave gateway part with the Irys gateway
-        const irysMetadataUri = metadataUri.replace(
-            "arweave.net",
-            "gateway.irys.xyz"
-        );
+    console.log("Uploading Metadata...");
+    const metadataUri = await umi.uploader.uploadJson(metadata).catch((err) => {
+        throw new Error(err);
+    });
 
-        console.log("metadataUri: " + irysMetadataUri);
-    }
-    catch(error){
+    // Replace the Arweave gateway part with the Irys gateway
+    const irysMetadataUri = metadataUri.replace(
+        "arweave.net",
+        "gateway.irys.xyz"
+    );
 
-    }
+    console.log("metadataUri: " + irysMetadataUri);
 
-    await checkCandyMachine(umi, candyMachine.publicKey, {
-        itemsLoaded: configLines.length,
-        authority: umi.identity.publicKey,
+    //
+    // ** Creating the NFT **
+    //
+
+    // We generate a signer for the NFT
+    const asset = generateSigner(umi);
+
+    console.log("Creating NFT...");
+    const tx = await create(umi, {
+        asset,
+        name: data.name,
+        uri: irysMetadataUri,
         collection: collectionAddress,
-        itemsRedeemed: 0,
-    }, 5);
+        collectionUpdateAuthority: umi.identity,
+        authority: umi.identity.publicKey,
+    }).sendAndConfirm(umi);
 
-    // Mint NFTs
-    try {
-        const numMints = configLines.length;
-        let minted = 0;
-        for (let i = 0; i < numMints; i++) {
-            await transactionBuilder()
-                .add(setComputeUnitLimit(umi, { units: 800_000 }))
-                .add(
-                    mintV1(umi, {
-                        candyMachine: candyMachine.publicKey,
-                        asset: generateSigner(umi),
-                        collection: collectionAddress,
-                        mintArgs: {
-                            solPayment: some({ destination: treasury.publicKey }),
-                        },
-                    })
-                )
-                .sendAndConfirm(umi, options);
-            minted++;
-        }
-        console.log(`✅ - Minted ${minted} NFTs.`);
-    } catch (error) {
-        console.log(error)
-        console.log('❌ - Error minting NFTs.');
-    }
-    
-    try {
-        await deleteCandyMachine(umi, {
-            candyMachine: candyMachine.publicKey,
-        }).sendAndConfirm(umi, options);
-        console.log(`✅ - Deleted the Candy Machine: ${candyMachine.publicKey.toString()}`);
-    } catch (error) {
-        console.log(error)
-        console.log('❌ - Error deleting the Candy Machine.');
-    }
-}
+    // Finally we can deserialize the signature that we can check on chain.
+    const signature = base58.deserialize(tx.signature)[0];
 
+    // Log out the signature and the links to the transaction and the NFT.
+    console.log("\nNFT Created");
+    console.log("View Transaction on Solana Explorer");
+    console.log(`https://explorer.solana.com/tx/${signature}?cluster=devnet`);
+    console.log("\n");
+    console.log("View NFT on Metaplex Explorer");
+    console.log(
+        `https://core.metaplex.com/explorer/${asset.publicKey}?env=devnet`
+    );
 
+    const md = findMetadataPda(umi, { 
+        mint: publicKey(asset.publicKey)
+      });
 
+    await verifyCollectionV1(umi, {
+        metadata: md,
+        collectionMint: collectionAddress,
+        authority: umi.identity.publicKey,
+    }).sendAndConfirm(umi);
 
+    console.log("verifyCollection ok");
 
-async function checkCandyMachine(
-    umi,
-    candyMachine,
-    expectedCandyMachineState,
-    step
-) {
-    try {
-        const loadedCandyMachine = await fetchCandyMachine(umi, candyMachine, options.confirm);
-        const { itemsLoaded, itemsRedeemed, authority, collection } = expectedCandyMachineState;
-        if (Number(loadedCandyMachine.itemsRedeemed) !== itemsRedeemed) {
-            throw new Error('Incorrect number of items available in the Candy Machine.');
-        }
-        if (loadedCandyMachine.itemsLoaded !== itemsLoaded) {
-            throw new Error('Incorrect number of items loaded in the Candy Machine.');
-        }
-        if (loadedCandyMachine.authority.toString() !== authority.toString()) {
-            throw new Error('Incorrect authority in the Candy Machine.');
-        }
-        if (loadedCandyMachine.collectionMint.toString() !== collection.toString()) {
-            throw new Error('Incorrect collection in the Candy Machine.');
-        }
-        step && console.log(`${step}. ✅ - Candy Machine has the correct configuration.`);
-    } catch (error) {
-        if (error instanceof Error) {
-            step && console.log(`${step}. ❌ - Candy Machine incorrect configuration: ${error.message}`);
-        } else {
-            step && console.log(`${step}. ❌ - Error fetching the Candy Machine.`);
-        }
-    }
+    res.json({
+        status: true
+    });
+    return;
 }

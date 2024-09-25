@@ -17,7 +17,7 @@ import {
     mintNFT,
     mintCollection,
     mintCoreNFT
-} from "./src/createNFT.js";
+} from "./_createNFT.js";
 // import {
 //     createCollectionMint
 // } from "./src/collectionMint.js";

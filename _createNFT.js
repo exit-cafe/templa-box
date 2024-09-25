@@ -62,7 +62,7 @@ export const mintCollection = async () => {
 export const mintCoreNFT = async (umi, irysImageUri, imageUri, collectionAddress) => {
 
     const metadata = {
-        name: "My NFTs",
+        name: "IAM",
         description: "This is an NFT on Solana",
         image: irysImageUri,
         external_url: "https://example.com",
@@ -112,9 +112,9 @@ export const mintCoreNFT = async (umi, irysImageUri, imageUri, collectionAddress
     console.log("Creating NFT...");
     const tx = await create(umi, {
         asset,
-        name: "My NFTs1",
+        name: "IAM",
         uri: irysMetadataUri,
-        collection: collectionAddress,
+        collection: "BGURYGoimsP6knui5fDwuTtmDGRCM6KFxZZTFX7aGdDy",
         collectionUpdateAuthority: umi.identity,
         authority: umi.identity.publicKey,
     }).sendAndConfirm(umi);
