@@ -54,15 +54,13 @@ async function main() {
     });
 
     // 1. Airdrop 100 SOL to the keypair
-    // 1. Airdrop 100 SOL to the keypair
-    // try {
-    //     await umi.rpc.airdrop(keypair.publicKey, sol(100), options.confirm);
-    //     console.log(`1. ✅ - Airdropped 100 SOL to the ${keypair.publicKey.toString()}`)
-    // } catch (error) {
-    //     console.log('1. ❌ - Error airdropping SOL to the wallet.');
-    // }
+    try {
+        await umi.rpc.airdrop(keypair.publicKey, sol(0.1), options.confirm);
+        console.log(`1. ✅ - Airdropped 0.1 SOL to the ${keypair.publicKey.toString()}`)
+    } catch (error) {
+        console.log('1. ❌ - Error airdropping SOL to the wallet.');
+    }
 
-    // 2. Create a collection
     // 2. Create a collection
     try {
         await createCollectionV1(umi, {
@@ -75,13 +73,12 @@ async function main() {
         console.log('2. ❌ - Error creating collection.');
     }
 
-    // 3. Create a Candy Machine    
     // 3. Create a Candy Machine
     try {
         const createIx = await create(umi, {
             candyMachine,
-            collection: "AA3iQCFM2yiRyE4EvjsVmkByTkbk4SGAb43JFMfZ9vJe",
-            // collection: collectionMint.publicKey,
+            // collection: "AA3iQCFM2yiRyE4EvjsVmkByTkbk4SGAb43JFMfZ9vJe",
+            collection: collectionMint.publicKey,
             collectionUpdateAuthority: umi.identity,
             itemsAvailable: 3,
             authority: umi.identity.publicKey,
@@ -106,15 +103,14 @@ async function main() {
     }
 
     // 4. Add items to the Candy Machine
-    // 4. Add items to the Candy Machine
     try {
         await addConfigLines(umi, {
             candyMachine: candyMachine.publicKey,
             index: 0,
             configLines: [
-                { name: 'i am 1', uri: '1.json' },
-                { name: 'i am 2', uri: '2.json' },
-                { name: 'i am 3', uri: '3.json' },
+                { name: 'On am 1', uri: '1.json' },
+                { name: 'On am 2', uri: '2.json' },
+                { name: 'On am 3', uri: '3.json' },
             ],
         }).sendAndConfirm(umi, options);
         console.log(`4. ✅ - Added items to the Candy Machine: ${candyMachine.publicKey.toString()}`)
@@ -123,16 +119,14 @@ async function main() {
     }
 
     // 5. Verify the Candy Machine configuration
-    // 5. Verify the Candy Machine configuration
-    await checkCandyMachine(umi, candyMachine.publicKey, {
-        itemsLoaded: 3,
-        authority: umi.identity.publicKey,
-        collection: "AA3iQCFM2yiRyE4EvjsVmkByTkbk4SGAb43JFMfZ9vJe",
-        // collection: collectionMint.publicKey,
-        itemsRedeemed: 0,
-    }, 5);
+    // await checkCandyMachine(umi, candyMachine.publicKey, {
+    //     itemsLoaded: 3,
+    //     authority: umi.identity.publicKey,
+    //     // collection: "AA3iQCFM2yiRyE4EvjsVmkByTkbk4SGAb43JFMfZ9vJe",
+    //     collection: collectionMint.publicKey,
+    //     itemsRedeemed: 0,
+    // }, 5);
 
-    // 6. Mint NFTs
     // 6. Mint NFTs
     try {
         const numMints = 3;
@@ -144,8 +138,8 @@ async function main() {
                     mintV1(umi, {
                         candyMachine: candyMachine.publicKey,
                         asset: generateSigner(umi),
-                        collection: "AA3iQCFM2yiRyE4EvjsVmkByTkbk4SGAb43JFMfZ9vJe",
-                        // collection: collectionMint.publicKey,
+                        // collection: "AA3iQCFM2yiRyE4EvjsVmkByTkbk4SGAb43JFMfZ9vJe",
+                        collection: collectionMint.publicKey,
                         mintArgs: {
                             solPayment: some({ destination: treasury.publicKey }),
                         },
@@ -160,12 +154,11 @@ async function main() {
     }
 
     // 7. Verify the Candy Machine configuration
-    // 7. Verify the Candy Machine configuration
     // await checkCandyMachine(umi, candyMachine.publicKey, {
     //     itemsLoaded: 3,
     //     authority: umi.identity.publicKey,
-    //     collection: "AA3iQCFM2yiRyE4EvjsVmkByTkbk4SGAb43JFMfZ9vJe",
-    //     // collection: collectionMint.publicKey,
+    //     // collection: "AA3iQCFM2yiRyE4EvjsVmkByTkbk4SGAb43JFMfZ9vJe",
+    //     collection: collectionMint.publicKey,
     //     itemsRedeemed: 3,
     // }, 7);
 

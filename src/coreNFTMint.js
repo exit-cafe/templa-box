@@ -1,5 +1,5 @@
 import { createUmi } from '@metaplex-foundation/umi-bundle-defaults'
-import { create, mplCore } from "@metaplex-foundation/mpl-core";
+import { createV1, mplCore } from "@metaplex-foundation/mpl-core";
 import {
     publicKey,
     generateSigner,
@@ -9,7 +9,8 @@ import {
     sol,
     dateTime,
     createGenericFile,
-    signerIdentity
+    signerIdentity,
+    createSignerFromKeypair
 } from '@metaplex-foundation/umi';
 
 import {
@@ -33,6 +34,9 @@ export const createCoreNFTMint = async (data, res) => {
     const collectionAddress = data.collection ?? null;
     const file = data.file ?? null;
     const name = data.name ?? null;
+    const description = data.description ?? null;
+    const attributes = data.attributes ?? null;
+    const external_url = data.external_url ?? null;
 
     if( 
         file == null || 
@@ -59,7 +63,7 @@ export const createCoreNFTMint = async (data, res) => {
         fs.readFileSync("./id.json")
     );
 
-    let keypair = umi.eddsa.createKeypairFromSecretKey(
+    const keypair = umi.eddsa.createKeypairFromSecretKey(
         new Uint8Array(walletFile)
     );
 
@@ -84,11 +88,11 @@ export const createCoreNFTMint = async (data, res) => {
     console.log("imageUri: " + irysImageUri);
     
     const metadata = {
-        name: data.name,
-        description: data.description,
+        name: name,
+        description: description,
         image: irysImageUri,
-        external_url: data.external_url,
-        attributes: data.attributes,
+        external_url: external_url,
+        attributes: attributes,
         properties: {
             files: [
                 {
@@ -98,6 +102,10 @@ export const createCoreNFTMint = async (data, res) => {
             ],
             category: "image",
         },
+        collection: {
+            key: collectionAddress,
+            version: false
+        }
     };
 
     console.log("Uploading Metadata...");
@@ -121,13 +129,12 @@ export const createCoreNFTMint = async (data, res) => {
     const asset = generateSigner(umi);
 
     console.log("Creating NFT...");
-    const tx = await create(umi, {
+    const tx = await createV1(umi, {
         asset,
         name: data.name,
         uri: irysMetadataUri,
-        collection: collectionAddress,
-        collectionUpdateAuthority: umi.identity,
-        authority: umi.identity.publicKey,
+        collection: publicKey(collectionAddress),
+        authority: createSignerFromKeypair(umi, keypair)
     }).sendAndConfirm(umi);
 
     // Finally we can deserialize the signature that we can check on chain.
@@ -142,16 +149,6 @@ export const createCoreNFTMint = async (data, res) => {
     console.log(
         `https://core.metaplex.com/explorer/${asset.publicKey}?env=devnet`
     );
-
-    const md = findMetadataPda(umi, { 
-        mint: publicKey(asset.publicKey)
-      });
-
-    await verifyCollectionV1(umi, {
-        metadata: md,
-        collectionMint: collectionAddress,
-        authority: umi.identity.publicKey,
-    }).sendAndConfirm(umi);
 
     console.log("verifyCollection ok");
 

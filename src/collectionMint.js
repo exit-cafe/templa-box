@@ -3,6 +3,7 @@ import {
     generateSigner,
     keypairIdentity
 } from "@metaplex-foundation/umi";
+import { createMint } from "@metaplex-foundation/mpl-toolbox";
 import { createUmi } from "@metaplex-foundation/umi-bundle-defaults";
 import { base58 } from "@metaplex-foundation/umi/serializers";
 import { irysUploader } from "@metaplex-foundation/umi-uploader-irys";
@@ -14,7 +15,7 @@ import chalk from "chalk";
 export const createCollectionByName = async (name) => {
 
     console.log(chalk.blue(`\nCreating Collection: ${name}...\n`));
-  
+
     const umi = createUmi(config.server)
         .use(mplCore())
         .use(
@@ -36,18 +37,19 @@ export const createCollectionByName = async (name) => {
     umi.use(keypairIdentity(keypair));
 
     console.log(chalk.green('Step 1: Initializing setup... [OK]'));
-  
+
     //
     // ** Creating the Collection **
     //
-  
-    const collection = generateSigner(umi)
 
+    const collection = generateSigner(umi);
+    
     const tx = await createCollection(umi, {
-      collection,
-      name: name
+        collection,
+        name: name,
+        payer: umi.identity
     }).sendAndConfirm(umi);
-  
+
     const signature = base58.deserialize(tx.signature)[0];
 
     console.log(chalk.green('Step 2: Collection create... [OK]'));
@@ -62,8 +64,8 @@ export const createCollectionByName = async (name) => {
     console.log(chalk.bold.blue('\nProcess completed successfully! 🎉'));
 
     return {
-        "publicKey" : collection.publicKey,
-        "signature" : signature,
-        "name" : name
+        "publicKey": collection.publicKey,
+        "signature": signature,
+        "name": name
     };
 }
