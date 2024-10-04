@@ -31,12 +31,14 @@ const options = {
 
 export const createCoreNFTMint = async (data, res) => {
 
-    const collectionAddress = data.collection ?? null;
+    var collectionAddress = data.collection ?? null;
     const file = data.file ?? null;
     const name = data.name ?? null;
     const description = data.description ?? null;
     const attributes = data.attributes ?? null;
     const external_url = data.external_url ?? null;
+    
+    if( collectionAddress == "" ) collectionAddress = null;
 
     if( 
         file == null || 
@@ -59,12 +61,8 @@ export const createCoreNFTMint = async (data, res) => {
             })
         );
 
-    const walletFile = JSON.parse(
-        fs.readFileSync("./id.json")
-    );
-
     const keypair = umi.eddsa.createKeypairFromSecretKey(
-        new Uint8Array(walletFile)
+        new Uint8Array(config.wallet)
     );
 
     umi.use(keypairIdentity(keypair));
@@ -101,12 +99,15 @@ export const createCoreNFTMint = async (data, res) => {
                 },
             ],
             category: "image",
-        },
-        collection: {
+        }
+    };
+
+    if( collectionAddress != null ){
+        metadata.collection = {
             key: collectionAddress,
             version: false
         }
-    };
+    }
 
     console.log("Uploading Metadata...");
     const metadataUri = await umi.uploader.uploadJson(metadata).catch((err) => {
@@ -129,13 +130,19 @@ export const createCoreNFTMint = async (data, res) => {
     const asset = generateSigner(umi);
 
     console.log("Creating NFT...");
-    const tx = await createV1(umi, {
+
+    const createData = {
         asset,
         name: data.name,
         uri: irysMetadataUri,
-        collection: publicKey(collectionAddress),
         authority: createSignerFromKeypair(umi, keypair)
-    }).sendAndConfirm(umi);
+    };
+
+    if( collectionAddress != null ){
+        createData.collection = publicKey(collectionAddress);
+    }
+
+    const tx = await createV1(umi, createData).sendAndConfirm(umi);
 
     // Finally we can deserialize the signature that we can check on chain.
     const signature = base58.deserialize(tx.signature)[0];

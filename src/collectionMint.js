@@ -26,12 +26,8 @@ export const createCollectionByName = async (name) => {
             })
         );
 
-    const walletFile = JSON.parse(
-        fs.readFileSync("./id.json")
-    );
-
     let keypair = umi.eddsa.createKeypairFromSecretKey(
-        new Uint8Array(walletFile)
+        new Uint8Array(config.wallet)
     );
 
     umi.use(keypairIdentity(keypair));
@@ -43,7 +39,7 @@ export const createCollectionByName = async (name) => {
     //
 
     const collection = generateSigner(umi);
-    
+
     const tx = await createCollection(umi, {
         collection,
         name: name,
