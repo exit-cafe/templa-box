@@ -86,21 +86,26 @@ export const verifyCollection = async (data, res) => {
 
     console.log("metadataUri: " + irysMetadataUri);
 
-    await updateV1(umi, {
-        mint: generateSigner(umi),
-        metadata: findMetadataPda(umi, { mint : publicKey(contentMint) }),
-        updateAuthority: umi.identity,
-        data: {
-            uri: irysMetadataUri
-        },
-        authority: createSignerFromKeypair(umi, keypair)
-    }).sendAndConfirm(umi);
+    // await updateV1(umi, {
+    //     mint: generateSigner(umi),
+    //     metadata: findMetadataPda(umi, { mint : publicKey(contentMint) }),
+    //     updateAuthority: umi.identity,
+    //     uri: irysMetadataUri,
+    //     authority: createSignerFromKeypair(umi, keypair)
+    // }).sendAndConfirm(umi);
 
-    await verifyCollectionV1(umi, {
-        metadata: metadataPda,
-        collectionMint: collectionMint,
-        authority: createSignerFromKeypair(umi, keypair)
-    }).sendAndConfirm(umi);
+    // await verifyCollectionV1(umi, {
+    //     metadata: metadataPda,
+    //     collectionMint: collectionMint,
+    //     authority: createSignerFromKeypair(umi, keypair)
+    // }).sendAndConfirm(umi);
+
+    const nft = await umi.nfts().findByMint({ contentMint }).run();
+
+    const updatedMetadata = await umi.nfts().update({
+        nftOrSft: nft,
+        uri: irysMetadataUri, // 新しいメタデータURI
+    }).run();
 
     // const authority = createSignerFromKeypair(umi, keypair);
 
@@ -131,3 +136,130 @@ export const verifyCollection = async (data, res) => {
     });
     return;
 }
+
+
+
+
+
+// `umi.nfts` が関数として利用できないというエラーは、UMIのバージョンやAPIの違いによるものかもしれません。UMI SDKの構造がバージョンによって異なることがあるため、適切なメソッドを利用する必要があります。
+
+// まず、UMI SDKが正しくインストールされているか確認し、バージョンによっては異なるメソッドや構成が必要になることがあります。
+
+// ### 代替案: `@metaplex-foundation/mpl-token-metadata` を使う方法
+
+// `umi.nfts` を使う代わりに、`@metaplex-foundation/mpl-token-metadata` パッケージを使って、NFTのメタデータを直接操作することができます。こちらはSolana上でのNFTメタデータ操作によく使われるライブラリです。
+
+// #### 1. 必要なパッケージのインストール
+// 以下のコマンドで必要なパッケージをインストールします。
+
+// ```bash
+// npm install @metaplex-foundation/mpl-token-metadata @solana/web3.js @solana/spl-token
+// ```
+
+// #### 2. SolanaとMetaplexのセットアップ
+
+// 以下のコードでSolanaとMetaplexのセットアップを行います。
+
+// ```javascript
+// const {
+//   Metadata,
+//   UpdateMetadataV2,
+//   MetadataProgram,
+// } = require('@metaplex-foundation/mpl-token-metadata');
+// const { Connection, clusterApiUrl, Keypair, PublicKey } = require('@solana/web3.js');
+// const { sendAndConfirmTransaction, Transaction } = require('@solana/web3.js');
+
+// // Solanaのセットアップ
+// const connection = new Connection(clusterApiUrl('mainnet-beta'));
+// const keypair = Keypair.fromSecretKey(Uint8Array.from(YOUR_PRIVATE_KEY)); // あなたのウォレットの秘密鍵
+// ```
+
+// #### 3. Arweaveに新しいメタデータをアップロード
+
+// ```javascript
+// const Arweave = require('arweave');
+
+// // Arweaveのセットアップ
+// const arweave = Arweave.init({
+//   host: 'arweave.net',
+//   port: 443,
+//   protocol: 'https',
+// });
+
+// async function uploadMetadataToArweave(newName, currentMetadata) {
+//   const newMetadata = {
+//     ...currentMetadata,
+//     name: newName,
+//   };
+
+//   const transaction = await arweave.createTransaction({
+//     data: JSON.stringify(newMetadata),
+//   });
+
+//   transaction.addTag('Content-Type', 'application/json');
+
+//   // 署名して送信
+//   await arweave.transactions.sign(transaction, YOUR_ARWEAVE_KEY);
+//   const response = await arweave.transactions.post(transaction);
+
+//   if (response.status === 200) {
+//     console.log('Metadata uploaded:', transaction.id);
+//     return `https://arweave.net/${transaction.id}`;
+//   } else {
+//     throw new Error('Failed to upload metadata');
+//   }
+// }
+// ```
+
+// #### 4. NFTのメタデータを更新
+
+// アップロードした新しいURIを使って、NFTのメタデータを更新します。
+
+// ```javascript
+// async function updateNftMetadata(mintAddress, arweaveUri) {
+//   const mintPublicKey = new PublicKey(mintAddress);
+//   const metadataPDA = await Metadata.getPDA(mintPublicKey);
+
+//   // 更新するメタデータの構築
+//   const transaction = new Transaction().add(
+//     new UpdateMetadataV2(
+//       {
+//         feePayer: keypair.publicKey,
+//       },
+//       {
+//         metadata: metadataPDA,
+//         updateAuthority: keypair.publicKey,
+//         primarySaleHappened: null,
+//         isMutable: true,
+//         data: {
+//           name: 'New NFT Name', // ここで新しい名前に変更
+//           symbol: '',
+//           uri: arweaveUri, // 新しいURIを設定
+//           sellerFeeBasisPoints: 500, // 販売手数料
+//           creators: null,
+//         },
+//       }
+//     )
+//   );
+
+//   // トランザクションを送信
+//   const signature = await sendAndConfirmTransaction(
+//     connection,
+//     transaction,
+//     [keypair]
+//   );
+//   console.log('Transaction confirmed with signature:', signature);
+// }
+
+// const mintAddress = 'YOUR_NFT_MINT_ADDRESS'; // NFTのMintアドレス
+// uploadMetadataToArweave('New NFT Name', currentMetadata).then((arweaveUri) => {
+//   updateNftMetadata(mintAddress, arweaveUri);
+// });
+// ```
+
+// ### まとめ
+// 1. **`@metaplex-foundation/mpl-token-metadata`** を使ってNFTメタデータを更新します。
+// 2. **Arweave** に新しいメタデータ（新しい名前を含む）をアップロードします。
+// 3. アップロードしたURIを使って、Solana上のNFTメタデータを更新し、名前を変更します。
+
+// `umi.nfts` が利用できない場合、このアプローチでNFTの名前を変更することが可能です。
